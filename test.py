@@ -20,4 +20,26 @@ def test_validate_endpoint():
 
 
 
+
+class SignUpSchema(BaseModel):
+    email:str
+    password:str
+
+    class Config:
+        schema_extra ={
+            "example":{
+                "email": "sample@gmail.com",
+                "password": "samplepass123"
+            }
+        }
+
+
+        
+
+def test_create_account():
+
+
+async def create_account(user_data:SignUpSchema):
+
+
 print(test_validate_endpoint())
