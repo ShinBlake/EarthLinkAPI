@@ -14,7 +14,6 @@ from geopy.distance import great_circle
 import ast
 
 
-
 app = FastAPI(
     description="Test app",
     title="EarthLinksSB",
@@ -40,6 +39,33 @@ firebaseConfig = {
 firebase = pyrebase.initialize_app(firebaseConfig)
 db = firebase.database()
 
+
+
+# TODO: FIX LATER FOR GOOGLE SIGN-UP INTEGRATION
+# @app.post("/signup2")
+# async def signup(id_token: str):
+#     try:
+#         # Verify the ID token and create a new Firebase Auth user
+#         decoded_token = auth.verify_id_token(id_token)
+#         uid = decoded_token['uid']
+#         # Additional user creation steps can go here (e.g., storing user info in a database)
+#         return {"uid": uid}
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
+    
+    
+
+# @app.post("/login")
+# async def login(id_token: str):
+#     try:
+#         # Verify the ID token
+#         decoded_token = auth.verify_id_token(id_token)
+#         uid = decoded_token['uid']
+#         # Here, you can handle additional login logic
+#         return {"uid": uid}
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
+    
 
 # post method for creating new account
 @app.post('/signup')
