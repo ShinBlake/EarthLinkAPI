@@ -213,26 +213,26 @@ async def get_messages_from_user(userID: str):
 @app.get("/getMessagesByRadius/{latitude}/{longitude}")
 async def get_messages_by_radius(latitude: float, longitude: float):
     try:
-
-
         geohash = geohash2.encode(latitude, longitude, precision=10)
         boundary = calculate_radius_boundary(geohash)
-
         min_lat, max_lat, min_lon, max_lon = get_bounding_box(boundary)
 
-        # Calculate geohash range for bounding box corners
+        # GeoHash range query
         min_geohash = geohash2.encode(min_lat, min_lon, precision=10)
         max_geohash = geohash2.encode(max_lat, max_lon, precision=10)
-
-        # Query Firebase for messages in the geohash range
         messages = db.child("messages").order_by_child("geohash").start_at(min_geohash).end_at(max_geohash).get().val()
 
-        return JSONResponse(content = messages, status_code = 200)
+        # Filter messages by actual distance
+        center_point = (latitude, longitude)
+        filtered_messages = []
+        for message_id, message in messages.items():
+            message_coords = (message['latitude'], message['longitude'])
+            if is_within_radius(center_point, message_coords, 10):
+                filtered_messages.append(message)
+
+        return JSONResponse(content=filtered_messages, status_code=200)
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 def calculate_radius_boundary(geohash, radius_meters=10, num_points=32):
     # Decode geohash to get center latitude and longitude
