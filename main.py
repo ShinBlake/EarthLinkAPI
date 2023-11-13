@@ -133,7 +133,8 @@ async def validate_token(request:Request):
 
     user = auth.verify_id_token(jwt)
 
-    return user["user_id"]
+    return JSONResponse(content = {"userID": user["user_id"]}
+                        ,status_code = 200)
 
 
 
