@@ -1,7 +1,7 @@
 {
     "AWSEBDockerrunVersion": "1",
     "Image": {
-      "Name": "shinblake/earthlink:latest",
+      "Name": "shinblake/earthlink:version3",
       "Update": "true"
     },
     "Ports": [
