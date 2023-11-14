@@ -20,6 +20,10 @@ app = FastAPI(
     docs_url="/"
 )
 
+@app.get("/")
+def home():
+    return {"Hello": "World"}
+
 
 if not firebase_admin._apps:
     cred = credentials.Certificate("serviceAccountKey.json")
@@ -38,6 +42,8 @@ firebaseConfig = {
 
 firebase = pyrebase.initialize_app(firebaseConfig)
 db = firebase.database()
+
+
 
 
 
