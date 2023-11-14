@@ -16,7 +16,7 @@ import ast
 
 app = FastAPI(
     description="Test app",
-    title="EarthLinksSB",
+    title="EarthLink",
     docs_url="/"
 )
 
