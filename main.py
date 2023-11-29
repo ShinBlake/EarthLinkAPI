@@ -45,34 +45,6 @@ db = firebase.database()
 
 
 
-
-
-# TODO: FIX LATER FOR GOOGLE SIGN-UP INTEGRATION
-# @app.post("/signup2")
-# async def signup(id_token: str):
-#     try:
-#         # Verify the ID token and create a new Firebase Auth user
-#         decoded_token = auth.verify_id_token(id_token)
-#         uid = decoded_token['uid']
-#         # Additional user creation steps can go here (e.g., storing user info in a database)
-#         return {"uid": uid}
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=str(e))
-    
-    
-
-# @app.post("/login")
-# async def login(id_token: str):
-#     try:
-#         # Verify the ID token
-#         decoded_token = auth.verify_id_token(id_token)
-#         uid = decoded_token['uid']
-#         # Here, you can handle additional login logic
-#         return {"uid": uid}
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=str(e))
-    
-
 # post method for creating new account
 @app.post('/signup')
 async def create_account(user_data:SignUpSchema):
@@ -98,11 +70,19 @@ async def create_account(user_data:SignUpSchema):
             status_code=400,
             detail=f"Account already created for the email {email}"
         )
+    except ValueError as e:
+        raise(
+            HTTPException(
+                status_code = 422,
+                detail=str(e)
+            )
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=str(e)
         )
+
 
 
 #post for creating access token for user login
@@ -160,19 +140,25 @@ async def post_message(message_data:MessageSchema):
                                       "message_id": result["name"]},
                             status_code = 200)
     
-    except db.TransactionAbortedError:
+    except Exception as e:
         raise HTTPException(
-            status_code = 400,
-            detail="Failed to store message"
+            status_code=500,
+            detail=str(e)
         )
     
 
 #request to get all users
 @app.get("/getUsers")
 async def get_users():
-    data = db.child("users").get()
-    return JSONResponse(content = {data},
-                        status_code = 200)
+    try:
+        data = db.child("users").get().val()
+        return JSONResponse(content = data,
+                            status_code = 200)
+    except Exception as e:
+        raise HTTPException(
+            status_code = 500,
+            detail = str(e)
+        )
 
 
 
@@ -295,7 +281,129 @@ async def deleteMessage(messageID: str):
         print(f"Error occured while deleting message: {e}")
 
 
+#delete user account
 
+
+#helper method to get the current reaction of user on the message, if any
+def getCurrentReaction(key: str):
+    try:
+        res = db.child("reactions").order_by_child("reaction_id").equal_to(key).get().val()
+        return res
+    except Exception as e:
+        raise HTTPException(
+            status_code = 500,
+            detail = str(e)
+        )
+    
+
+#helper method to update the reactions in message database accordingly
+def updateReactions(message_id: str, reaction_type: int, prev_reaction: int):
+    try:        
+        message = db.child("messages").child(message_id).get().val()
+        cur_likes = 0
+        cur_dislikes = 0
+        if message['likes']:
+            cur_likes = message['likes']
+
+        if message['dislikes']:
+            cur_dislikes = message['dislikes']
+
+
+        #if prev reaction was like/dislike, then remove it
+        if prev_reaction == 1:
+            cur_likes -= 1
+        elif prev_reaction == -1:
+            cur_dislikes -= 1
+        
+        if reaction_type == 1:
+            cur_likes += 1
+        elif reaction_type == -1:
+            cur_dislikes += 1
+
+        message['likes'] = cur_likes
+        message['dislikes'] = cur_dislikes
+
+        response = db.child('messages').child(message_id).update(message)
+
+        return JSONResponse(content ={"message": response},
+                            status_code = 200)
+
+
+    except Exception as e:
+        raise HTTPException(
+            status_code = 500,
+            detail = "error with update Reactions"
+        )
+
+
+
+#change likes/dislikes
+#accepts: userid, messageid, and reaction type.
+#if reaction type is like/dislike, it updates accordingly. If it is none, then it removes any reaction
+#update the message accordingly
+@app.post("/changeReactions")
+async def changeReactions(reaction_data:ReactionsSchema):
+
+    try:
+        #extract the correct information from input
+        data = reaction_data.dict()
+        user_uid = data['user_uid']
+        message_id = data['message_id']
+        reaction_type = data['reaction_type']
+        key = message_id + ":" + user_uid
+
+
+        #check if there is any existing reaction
+
+        cur_reaction_key = None
+        cur = getCurrentReaction(key)
+        prev_reaction = 0
+
+        #if there is existing one
+        if cur:
+            for key in cur:
+                cur_reaction_key = key
+                prev_reaction = cur[key]['reaction_type']
+
+        if prev_reaction != reaction_type:
+            #update the message accordingly
+            response = updateReactions(message_id, reaction_type, prev_reaction)
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code = 500,
+                    detail = "Error updating message data"
+                )
+
+            
+            #store the data into reaction database
+
+            store_data = {}
+            store_data['reaction_id'] = key
+            store_data['user_uid'] = user_uid
+            store_data['message_id'] = message_id
+            store_data['reaction_type'] = reaction_type
+            store_data['timestamp'] = data["timestamp"].isoformat()
+            #if reaction already existed
+
+            if cur_reaction_key:
+                result = db.child("reactions").child(cur_reaction_key).update(store_data)
+            else:
+                result = db.child("reactions").push(store_data)
+
+
+            return JSONResponse(content ={"message": "Message updated successfully", 
+                                          "result": result},
+                                status_code = 200)
+        else:
+            return JSONResponse(content={"message": "Already liked/disliked"})
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+
+#get all posts that a user liked
 
 if __name__ == "__main__":
     uvicorn.run("main:app",reload=True)
