@@ -11,7 +11,8 @@ import geohash2
 from geopy.distance import distance
 import numpy as np
 from geopy.distance import great_circle
-import ast
+from datetime import datetime, date, time
+
 
 
 app = FastAPI(
@@ -40,9 +41,9 @@ firebaseConfig = {
   "databaseURL": "https://earthlinks-7c491-default-rtdb.firebaseio.com/"
 }
 
+
 firebase = pyrebase.initialize_app(firebaseConfig)
 db = firebase.database()
-
 
 
 # post method for creating new account
@@ -55,10 +56,9 @@ async def create_account(user_data:SignUpSchema):
         user = auth.create_user(
             email = email,
             password = password
-        )
+        )        
 
-
-        data = {"UID" : user.uid, "username": user.uid, "bio": "", "profile_picture": "gs://earthlinks-7c491.appspot.com/person-24px.xml"}
+        data = {"UID" : user.uid, "email": email, "username": user.uid, "bio": "Say something about yourself...", "date_created": date.today().isoformat(), "profile_picture": "gs://earthlinks-7c491.appspot.com/person-24px.xml"}
         db_result = db.child("users").push(data)
 
 
@@ -96,14 +96,15 @@ async def create_access_token(user_data:LoginSchema):
             email=email,
             password = password
         )
-
         token = user['idToken']
-
+    
         return JSONResponse(
             content={
-                "token":token
+                "token": token
             }, status_code=200
-        )
+            )
+   
+        
     except:
         raise HTTPException(
             status_code=400,
@@ -201,13 +202,19 @@ async def get_messages_from_user(userID: str):
             detail = str(e)
         )
     
+  
 
-#get messags within 10 meter radius
+#get messags within 80 meter radius
 @app.get("/getMessagesByRadius/{latitude}/{longitude}")
 async def get_messages_by_radius(latitude: float, longitude: float):
     try:
+
+        #CHANGE THIS TO CHANGE THE RADIUS
+        cur_radius = 80
+
+
         geohash = geohash2.encode(latitude, longitude, precision=10)
-        boundary = calculate_radius_boundary(geohash)
+        boundary = calculate_radius_boundary(geohash, radius_meters=cur_radius)
         min_lat, max_lat, min_lon, max_lon = get_bounding_box(boundary)
 
         # GeoHash range query
@@ -215,19 +222,55 @@ async def get_messages_by_radius(latitude: float, longitude: float):
         max_geohash = geohash2.encode(max_lat, max_lon, precision=10)
         messages = db.child("messages").order_by_child("geohash").start_at(min_geohash).end_at(max_geohash).get().val()
 
+        if not messages:
+            return JSONResponse(content = {"message": "No messages found around this area"}, status_code= 200)
         # Filter messages by actual distance
         center_point = (latitude, longitude)
         filtered_messages = []
         for message_id, message in messages.items():
             message_coords = (message['latitude'], message['longitude'])
-            if is_within_radius(center_point, message_coords, 10):
+            if is_within_radius(center_point, message_coords, cur_radius):
                 filtered_messages.append(message)
 
-        return JSONResponse(content=filtered_messages, status_code=200)
+        
+        #loop through 
+        if not filtered_messages:
+            return JSONResponse(content = {"message": "No messages found around this area"}, status_code= 200)
+    
+        clusters = cluster_messages(filtered_messages, radius_meters=5)
+
+        return JSONResponse(content=clusters, status_code=200)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+#cluster the list of messages into list of messages within 5 meters of eachother
+def cluster_messages(messages, radius_meters=5):
+    # Convert messages to a list of (id, latitude, longitude)
+    # message_list = [(mid, m['latitude'], m['longitude']) for mid, m in messages.items()]
+    
+    clusters = []
+    while messages:
+        # Start a new cluster
+        cluster = []
+        base_message = messages.pop(0)
+        cluster.append(base_message)
+        
+        # Check for nearby messages
+        i = 0
+        while i < len(messages):
+            if is_within_radius((base_message.get("latitude"), base_message.get("longitude")), (messages[i].get("latitude"), messages[i].get("longitude")), radius_meters):
+                # Add to cluster and remove from list
+                cluster.append(messages.pop(i))
+            else:
+                i += 1
 
-def calculate_radius_boundary(geohash, radius_meters=10, num_points=32):
+        # Add cluster to list of clusters
+        clusters.append(cluster)
+
+    return clusters
+
+
+def calculate_radius_boundary(geohash, radius_meters, num_points=32):
     # Decode geohash to get center latitude and longitude
     lat, lon, _, _ = geohash2.decode_exactly(geohash)
 
@@ -285,9 +328,9 @@ async def deleteMessage(messageID: str):
 
 
 #helper method to get the current reaction of user on the message, if any
-def getCurrentReaction(key: str):
+def getCurrentReaction(reaction_key: str):
     try:
-        res = db.child("reactions").order_by_child("reaction_id").equal_to(key).get().val()
+        res = db.child("reactions").order_by_child("reaction_id").equal_to(reaction_key).get().val()
         return res
     except Exception as e:
         raise HTTPException(
@@ -302,10 +345,11 @@ def updateReactions(message_id: str, reaction_type: int, prev_reaction: int):
         message = db.child("messages").child(message_id).get().val()
         cur_likes = 0
         cur_dislikes = 0
-        if message['likes']:
+
+        if 'likes' in message:
             cur_likes = message['likes']
 
-        if message['dislikes']:
+        if 'dislikes' in message:
             cur_dislikes = message['dislikes']
 
 
@@ -350,13 +394,15 @@ async def changeReactions(reaction_data:ReactionsSchema):
         user_uid = data['user_uid']
         message_id = data['message_id']
         reaction_type = data['reaction_type']
-        key = message_id + ":" + user_uid
+        reaction_key = message_id + ":" + user_uid
+        print(reaction_key)
 
 
         #check if there is any existing reaction
 
         cur_reaction_key = None
-        cur = getCurrentReaction(key)
+        cur = getCurrentReaction(reaction_key)
+        print(cur)
         prev_reaction = 0
 
         #if there is existing one
@@ -378,7 +424,8 @@ async def changeReactions(reaction_data:ReactionsSchema):
             #store the data into reaction database
 
             store_data = {}
-            store_data['reaction_id'] = key
+            print(reaction_key)
+            store_data['reaction_id'] = reaction_key
             store_data['user_uid'] = user_uid
             store_data['message_id'] = message_id
             store_data['reaction_type'] = reaction_type
@@ -402,8 +449,50 @@ async def changeReactions(reaction_data:ReactionsSchema):
             detail=str(e)
         )
 
+#helper method to get all reactions by a specific user
+def getAllReactionsByUser(user_uid:str):
+    try:
+        reactions = db.child("reactions").order_by_child("user_uid").equal_to(user_uid).get().val()
+        return reactions
+    except Exception as e:
+        print("Error getting all reactions by user")
 
-#get all posts that a user liked
+
+def getMessagesByID(message_ids:list):
+    try:
+        messages = {}
+        for message_id in message_ids:
+            message = db.child("messages").child(message_id).get().val()
+            messages[message_id] = message
+        return messages
+    except Exception as e:
+        print("Error getting all message from message ID's")
+
+#get all posts that a user liked in form of dictionary,
+# Returns: dictionary (key = message_id, value = message data content)
+@app.get("/getLikedPostsByUser/{user_uid}")
+async def getLikedPostsByUser(user_uid: str):
+    try:
+        reactions = getAllReactionsByUser(user_uid)
+        message_ids= []
+        for entry in reactions.values():
+            if entry.get('reaction_type') == 1:
+                message_ids.append(entry.get("message_id"))
+        return getMessagesByID(message_ids)
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code = 500,
+            detail = str(e)
+        )
+
+
+
+#filters
+
+#from most liked to least liked
+#most popular/most views
+#most comments
 
 if __name__ == "__main__":
     uvicorn.run("main:app",reload=True)
