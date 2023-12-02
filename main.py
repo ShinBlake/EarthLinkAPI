@@ -233,6 +233,7 @@ async def get_messages_by_radius(latitude: float, longitude: float, max_number: 
         for message_id, message in messages.items():
             message_coords = (message['latitude'], message['longitude'])
             if is_within_radius(center_point, message_coords, cur_radius):
+                message["message_id"] = message_id
                 filtered_messages.append(message)
 
         
