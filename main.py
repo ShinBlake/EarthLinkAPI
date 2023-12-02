@@ -319,12 +319,10 @@ def is_within_radius(center, point, radius_meters):
 async def deleteMessage(messageID: str):
     try:
         response = db.child("messages").child(messageID).remove()
-        return response
+        return JSONResponse(content = {"message": "post {messageID} successfully deleted", "response" : response})
     except Exception as e:
         print(f"Error occured while deleting message: {e}")
 
-
-#delete user account
 
 
 #helper method to get the current reaction of user on the message, if any
@@ -478,7 +476,9 @@ async def getLikedPostsByUser(user_uid: str):
         for entry in reactions.values():
             if entry.get('reaction_type') == 1:
                 message_ids.append(entry.get("message_id"))
-        return getMessagesByID(message_ids)
+        return JSONResponse(content = {"message": "reactions by user {user_uid}", 
+                                       "reactions" : getMessagesByID(message_ids)},
+                                       status_code = 200)
     
     except Exception as e:
         raise HTTPException(
@@ -486,6 +486,41 @@ async def getLikedPostsByUser(user_uid: str):
             detail = str(e)
         )
 
+
+#getting profile info
+@app.get("/getUserInfo/{user_uid}")
+async def getUserInfo(user_uid:str):
+    try:
+        user_info = db.child("users").order_by_child("UID").equal_to(user_uid).get().val()
+        return JSONResponse(content = {"message": "User info for user {user_uid} successfully retrieved", "user info": user_info},
+                            status_code = 200)
+    except Exception as e:
+        raise HTTPException(
+            status_code = 500,
+            detail = str(e)
+        )
+
+
+#deleting user account
+@app.delete("/deleteUser/{user_uid}")
+async def deleteUser(user_uid:str):
+    try:
+        response = db.child("users").order_by_child("UID").equal_to(user_uid).remove()
+        return JSONResponse(content = {"message": "user {user_uid} successfully deleted", "response" : response},
+                            status_code = 200)
+    except Exception as e:
+        raise HTTPException(
+            status_code = 500,
+            detail = str(e)
+        )
+
+#change user bio
+# @app.post("/changeUserBio/{user_uid}")
+# async def changeUserBio(user_uid:str):
+#     try:
+#         user = db.child("users").order_by_child("UID").equal_to(user_uid).
+
+#change user profile picture via link
 
 
 #filters
