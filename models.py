@@ -66,3 +66,19 @@ class ReactionsSchema(BaseModel):
         }
 
 
+class ChangeUserInfoSchema(BaseModel):
+    user_uid: str
+    bio : str
+    profile_pic: str
+    username : str
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "user_uid": "example_user",
+                "bio": "string",
+                "profile_pic": "link to picture",
+                "username": "string"
+            }
+        }
+

@@ -205,8 +205,8 @@ async def get_messages_from_user(userID: str):
   
 
 #get messags within 80 meter radius
-@app.get("/getMessagesByRadius/{latitude}/{longitude}")
-async def get_messages_by_radius(latitude: float, longitude: float):
+@app.get("/getMessagesByRadius/{latitude}/{longitude}/{max_number}")
+async def get_messages_by_radius(latitude: float, longitude: float, max_number: int):
     try:
 
         #CHANGE THIS TO CHANGE THE RADIUS
@@ -237,12 +237,19 @@ async def get_messages_by_radius(latitude: float, longitude: float):
         if not filtered_messages:
             return JSONResponse(content = {"message": "No messages found around this area"}, status_code= 200)
     
-        clusters = cluster_messages(filtered_messages, radius_meters=5)
+        #sort by timestamp
+        sorted_messages = sort_messages(messages=filtered_messages, max_number=max_number)
+        clusters = cluster_messages(sorted_messages, radius_meters=5)
 
         return JSONResponse(content=clusters, status_code=200)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+
+def sort_messages(messages, max_number):
+    sorted_data = sorted(messages, key=lambda x: datetime.fromisoformat(x["timestamp"]), reverse=True)
+    return sorted_data[:max_number]
+
 #cluster the list of messages into list of messages within 5 meters of eachother
 def cluster_messages(messages, radius_meters=5):
     # Convert messages to a list of (id, latitude, longitude)
@@ -514,11 +521,26 @@ async def deleteUser(user_uid:str):
             detail = str(e)
         )
 
-#change user bio
-# @app.post("/changeUserBio/{user_uid}")
-# async def changeUserBio(user_uid:str):
+# #change user bio
+# @app.post("/changeUserBio")
+# async def changeUserBio(change_info: ChangeUserInfoSchema):
 #     try:
-#         user = db.child("users").order_by_child("UID").equal_to(user_uid).
+#         user = db.child("users").order_by_child("UID").equal_to(change_info.user_uid).get().val()
+#         new_info = {}
+#         for cur in user.values():
+#             new_info = cur
+#             new_info["bio"] = change_info.bio
+        
+#         return new_info
+#         result = db.child("users").order_by_child("UID").equal_to(change_info.user_uid).update(new_info)
+#         return result
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code = 500,
+#             detail = str(e)
+#         )
+
+        
 
 #change user profile picture via link
 
