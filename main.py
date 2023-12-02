@@ -202,11 +202,14 @@ async def get_messages_from_user(userID: str):
             detail = str(e)
         )
     
-  
 
-#get messags within 80 meter radius
-@app.get("/getMessagesByRadius/{latitude}/{longitude}/{max_number}")
-async def get_messages_by_radius(latitude: float, longitude: float, max_number: int):
+
+
+#get messags within 80 meter radius sorted by timestamp
+#sort type 0 = by timestamp
+#sort type 1 = by number of likes
+@app.get("/getMessagesByRadius/{latitude}/{longitude}/{max_number}/{sort_type}")
+async def get_messages_by_radius(latitude: float, longitude: float, max_number: int, sort_type: int):
     try:
 
         #CHANGE THIS TO CHANGE THE RADIUS
@@ -238,7 +241,7 @@ async def get_messages_by_radius(latitude: float, longitude: float, max_number: 
             return JSONResponse(content = {"message": "No messages found around this area"}, status_code= 200)
     
         #sort by timestamp
-        sorted_messages = sort_messages(messages=filtered_messages, max_number=max_number)
+        sorted_messages = sort_messages(filtered_messages, max_number, sort_type)
         clusters = cluster_messages(sorted_messages, radius_meters=5)
 
         return JSONResponse(content=clusters, status_code=200)
@@ -246,9 +249,13 @@ async def get_messages_by_radius(latitude: float, longitude: float, max_number: 
         raise HTTPException(status_code=500, detail=str(e))
     
 
-def sort_messages(messages, max_number):
-    sorted_data = sorted(messages, key=lambda x: datetime.fromisoformat(x["timestamp"]), reverse=True)
+def sort_messages(messages, max_number, sort_type):
+    if sort_type == 0:
+        sorted_data = sorted(messages, key=lambda x: datetime.fromisoformat(x["timestamp"]), reverse=True)
+    else:
+        sorted_data = sorted(messages, key=lambda x: x.get('likes', 0), reverse=True)
     return sorted_data[:max_number]
+
 
 #cluster the list of messages into list of messages within 5 meters of eachother
 def cluster_messages(messages, radius_meters=5):
