@@ -191,10 +191,33 @@ async def get_all_messages():
         )
 
 
+# @app.get("/getMessagesFromUser/{userID}/{sort_type}")
+# async def get_messages_from_user(userID: str, sort_type: int):
+#     try:
+#         messages = db.child("messages").order_by_child("user_uid").equal_to(userID).get().val()
+#         message_list = []
+
+#         if not messages:
+#             return JSONResponse(content = {"message" : "No messages found"}, status_code = 200)
+        
+#         for message_id, message_val in messages.items():
+#             message_val["message_id"] = message_id
+#             message_list.append(message_val)
+        
+#         messages = sort_messages(message_list, 25, sort_type)
+#         return JSONResponse(content = message_list, status_code = 200)
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code = 500,
+#             detail = str(e)
+#         )
+    
+
 @app.get("/getMessagesFromUser/{userID}")
 async def get_messages_from_user(userID: str):
     try:
         messages = db.child("messages").order_by_child("user_uid").equal_to(userID).get().val()
+
         return JSONResponse(content = messages, status_code = 200)
     except Exception as e:
         raise HTTPException(
@@ -202,6 +225,7 @@ async def get_messages_from_user(userID: str):
             detail = str(e)
         )
     
+
 
 
 
@@ -529,26 +553,31 @@ async def deleteUser(user_uid:str):
             detail = str(e)
         )
 
-# #change user bio
-# @app.post("/changeUserBio")
-# async def changeUserBio(change_info: ChangeUserInfoSchema):
-#     try:
-#         user = db.child("users").order_by_child("UID").equal_to(change_info.user_uid).get().val()
-#         new_info = {}
-#         for cur in user.values():
-#             new_info = cur
-#             new_info["bio"] = change_info.bio
-        
-#         return new_info
-#         result = db.child("users").order_by_child("UID").equal_to(change_info.user_uid).update(new_info)
-#         return result
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code = 500,
-#             detail = str(e)
-#         )
+#change user info
+@app.post("/changeUserInfo")
+async def changeUserInfo(change_info: ChangeUserInfoSchema):
+    try:
+        user = db.child("users").order_by_child("UID").equal_to(change_info.user_uid).get().val()
+        new_info = {}
+        for cur in user.values():
+            new_info = cur
+            new_info["bio"] = change_info.bio
+            new_info["username"] = change_info.username
+            new_info["profile_picture"] = change_info.profile_pic
 
         
+        
+        result = db.child("users").order_by_child("UID").equal_to(change_info.user_uid).update(new_info)
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code = 500,
+            detail = str(e)
+        )
+
+
+#get messages from a user sorted
+#     
 
 #change user profile picture via link
 
