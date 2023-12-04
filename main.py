@@ -192,7 +192,7 @@ async def get_all_messages():
 
 
 @app.get("/getMessagesFromUser/{userID}/{sort_type}")
-async def get_messages_from_user(userID: str, sort_type: int):
+async def get_messages_from_user(userID: str, sort_type: int, search_term = None):
     try:
         messages = db.child("messages").order_by_child("user_uid").equal_to(userID).get().val()
         message_list = []
@@ -203,6 +203,9 @@ async def get_messages_from_user(userID: str, sort_type: int):
         for message_id, message_val in messages.items():
             message_val["message_id"] = message_id
             message_list.append(message_val)
+
+        if search_term:
+            message_list = [msg for msg in message_list if search_term.lower() in msg["message_content"].lower()]
 
         sorted_messages = sort_messages(message_list, 25, sort_type)
 
