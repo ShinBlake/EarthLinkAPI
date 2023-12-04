@@ -585,18 +585,18 @@ async def changeUserInfo(change_info: ChangeUserInfoSchema):
             detail = str(e)
         )
 
-
-#get messages from a user sorted
-#     
-
-#change user profile picture via link
-
-
-#filters
-
-#from most liked to least liked
-#most popular/most views
-#most comments
+@app.get("/getNumberMessages/{userID}")
+async def get_number_messages(userID: str):
+    try:
+        messages = db.child("messages").order_by_child("user_uid").equal_to(userID).get().val()
+        if not messages:
+            return JSONResponse(content={"message": "No messages found"}, status_code=200)
+        return JSONResponse(content={"number_messages": len(messages)}, status_code=200)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 if __name__ == "__main__":
     uvicorn.run("main:app",reload=True)
