@@ -191,43 +191,40 @@ async def get_all_messages():
         )
 
 
-# @app.get("/getMessagesFromUser/{userID}/{sort_type}")
-# async def get_messages_from_user(userID: str, sort_type: int):
+@app.get("/getMessagesFromUser/{userID}/{sort_type}")
+async def get_messages_from_user(userID: str, sort_type: int):
+    try:
+        messages = db.child("messages").order_by_child("user_uid").equal_to(userID).get().val()
+        message_list = []
+
+        if not messages:
+            return JSONResponse(content={"message": "No messages found"}, status_code=200)
+
+        for message_id, message_val in messages.items():
+            message_val["message_id"] = message_id
+            message_list.append(message_val)
+
+        sorted_messages = sort_messages(message_list, 25, sort_type)
+
+        return JSONResponse(content=sorted_messages, status_code=200)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+    
+
+# @app.get("/getMessagesFromUser/{userID}")
+# async def get_messages_from_user(userID: str):
 #     try:
 #         messages = db.child("messages").order_by_child("user_uid").equal_to(userID).get().val()
-#         message_list = []
 
-#         if not messages:
-#             return JSONResponse(content = {"message" : "No messages found"}, status_code = 200)
-        
-#         for message_id, message_val in messages.items():
-#             message_val["message_id"] = message_id
-#             message_list.append(message_val)
-        
-#         messages = sort_messages(message_list, 25, sort_type)
-#         return JSONResponse(content = message_list, status_code = 200)
+#         return JSONResponse(content = messages, status_code = 200)
 #     except Exception as e:
 #         raise HTTPException(
 #             status_code = 500,
 #             detail = str(e)
 #         )
-    
-
-@app.get("/getMessagesFromUser/{userID}")
-async def get_messages_from_user(userID: str):
-    try:
-        messages = db.child("messages").order_by_child("user_uid").equal_to(userID).get().val()
-
-        return JSONResponse(content = messages, status_code = 200)
-    except Exception as e:
-        raise HTTPException(
-            status_code = 500,
-            detail = str(e)
-        )
-    
-
-
-
 
 #get messags within 80 meter radius sorted by timestamp
 #sort type 0 = by timestamp
@@ -275,10 +272,19 @@ async def get_messages_by_radius(latitude: float, longitude: float, max_number: 
     
 
 def sort_messages(messages, max_number, sort_type):
-    if sort_type == 0:
-        sorted_data = sorted(messages, key=lambda x: datetime.fromisoformat(x["timestamp"]), reverse=True)
-    else:
-        sorted_data = sorted(messages, key=lambda x: x.get('likes', 0), reverse=True)
+    def parse_datetime(timestamp):
+        try:
+            return datetime.fromisoformat(timestamp)
+        except ValueError:
+            return datetime.min
+
+    def sort_key(item):
+        if sort_type == 0:
+            return parse_datetime(item.get("timestamp", ""))
+        elif sort_type == 1:
+            return item.get('likes', 0)
+
+    sorted_data = sorted(messages, key=sort_key, reverse=True)
     return sorted_data[:max_number]
 
 
