@@ -217,17 +217,18 @@ async def get_messages_from_user(userID: str, sort_type: int, search_term = None
         )
     
 
-# @app.get("/getMessagesFromUser/{userID}")
-# async def get_messages_from_user(userID: str):
-#     try:
-#         messages = db.child("messages").order_by_child("user_uid").equal_to(userID).get().val()
-
-#         return JSONResponse(content = messages, status_code = 200)
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code = 500,
-#             detail = str(e)
-#         )
+@app.get("/getNumberMessages/{userID}")
+async def get_number_messages(userID: str):
+    try:
+        messages = db.child("messages").order_by_child("user_uid").equal_to(userID).get().val()
+        if not messages:
+            return JSONResponse(content={"message": "No messages found"}, status_code=200)
+        return JSONResponse(content={"number_messages": len(messages)}, status_code=200)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 #get messags within 80 meter radius sorted by timestamp
 #sort type 0 = by timestamp
